@@ -427,41 +427,18 @@ async function generatePDFPage(pdf, pageIdx) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     
     const margin = 10;
-    const headerHeight = 25;
-    const footerHeight = 15;
-    const logoSize = 20;
+    const titleAreaHeight = 12;
+    const bottomTextHeight = 12;
     
-    // FONDO DEL ENCABEZADO
-    const headerRgb = hexToRgb(currentReport.headerColor || CONFIG.headerColor);
-    pdf.setFillColor(headerRgb.r, headerRgb.g, headerRgb.b);
-    pdf.rect(0, 0, pageWidth, headerHeight, 'F');
-    
-    // LOGO (si existe)
-    let logoX = margin;
-    if (currentReport.logoImage) {
-        try {
-            pdf.addImage(currentReport.logoImage, 'PNG', margin, 2.5, logoSize, logoSize);
-            logoX = margin + logoSize + 5;
-        } catch (e) {
-            console.warn('Error agregando logo:', e);
-        }
-    }
-    
-    // TÍTULO DEL ENCABEZADO
-    pdf.setTextColor(255, 255, 255);
+    // SOLO TÍTULO DEL REPORTE (sin barra, sin logo, sin fondo)
+    pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
-    const headerText = currentReport.headerText || 'EVIDENCIAS FOTOGRÁFICAS';
-    pdf.text(headerText, logoX, 15);
-    
-    // SUBTÍTULO (nombre del reporte)
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(currentReport.title, logoX, 20);
+    pdf.text(currentReport.title, pageWidth / 2, 10, { align: 'center' });
     
     // ÁREA DE CONTENIDO
-    const contentY = headerHeight + 5;
-    const contentHeight = pageHeight - headerHeight - footerHeight - 10;
+    const contentY = titleAreaHeight + 4;
+    const contentHeight = pageHeight - titleAreaHeight - bottomTextHeight - 10;
     
     // CALCULAR GRID DE FOTOS
     const photos = page.photos;
@@ -536,19 +513,16 @@ async function generatePDFPage(pdf, pageIdx) {
         }
     }
     
-    // PIE DE PÁGINA
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F');
-    
-    pdf.setTextColor(0, 0, 0);
+    // TEXTO ABAJO DE LA HOJA (sin fondo, sin rectángulo)
+    const footerText = currentReport.footerText || CONFIG.footerText;
+    pdf.setTextColor(80, 80, 80);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
-    
-    const footerText = currentReport.footerText || CONFIG.footerText;
-    pdf.text(footerText, pageWidth / 2, pageHeight - 8, { align: 'center' });
+    pdf.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
     
     // Número de página
     pdf.setFontSize(7);
+    pdf.setTextColor(100, 100, 100);
     pdf.text(`Página ${pageIdx + 1} de ${currentReport.pages.length}`, pageWidth - margin, pageHeight - 4, { align: 'right' });
 }
 
