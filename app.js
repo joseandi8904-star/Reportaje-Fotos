@@ -11,11 +11,8 @@ const CONFIG = {
     pdfTemplate: 'default',
     pdfAlignment: 'center',
     darkMode: false,
-    // NUEVAS CONFIGURACIONES PARA PERSONALIZACIÓN
-    headerText: 'EVIDENCIAS FOTOGRÁFICAS',
-    headerColor: '#FF6B35',
-    logoImage: null,  // Logo personalizado
-    footerText: 'Período del 01 de septiembre al 30 de septiembre de 2025 - INSTITUCIÓN EDUCATIVA'
+    logoImage: null,
+    bottomText: 'Período del 01 de septiembre al 30 de septiembre de 2025 - INSTITUCIÓN EDUCATIVA'
 };
 
 // Variables globales
@@ -24,10 +21,8 @@ let currentReport = {
     title: 'Reporte 1',
     pages: [{ photos: [] }],
     createdAt: new Date(),
-    headerText: CONFIG.headerText,
-    headerColor: CONFIG.headerColor,
     logoImage: CONFIG.logoImage,
-    footerText: CONFIG.footerText
+    bottomText: CONFIG.bottomText
 };
 
 let reports = [];
@@ -204,10 +199,8 @@ function showNewReport() {
         title: `Reporte ${reports.length + 1}`,
         pages: [{ photos: [] }],
         createdAt: new Date(),
-        headerText: CONFIG.headerText,
-        headerColor: CONFIG.headerColor,
         logoImage: CONFIG.logoImage,
-        footerText: CONFIG.footerText
+        bottomText: CONFIG.bottomText
     };
     
     currentPageIndex = 0;
@@ -427,18 +420,30 @@ async function generatePDFPage(pdf, pageIdx) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     
     const margin = 10;
-    const titleAreaHeight = 12;
-    const bottomTextHeight = 12;
-    
-    // SOLO TÍTULO DEL REPORTE (sin barra, sin logo, sin fondo)
+    const logoSize = 20;
+    const headerHeight = 25;
+    const bottomHeight = 10;
+
+    // LOGO (si existe, a la izquierda)
+    let titleX = margin;
+    if (currentReport.logoImage) {
+        try {
+            pdf.addImage(currentReport.logoImage, 'JPEG', margin, 2.5, logoSize, logoSize);
+            titleX = margin + logoSize + 5;
+        } catch (e) {
+            console.warn('Error agregando logo:', e);
+        }
+    }
+
+    // TÍTULO (texto negro, sin fondo de color)
     pdf.setTextColor(0, 0, 0);
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(currentReport.title, pageWidth / 2, 10, { align: 'center' });
-    
+    pdf.text(currentReport.title, titleX, 14);
+
     // ÁREA DE CONTENIDO
-    const contentY = titleAreaHeight + 4;
-    const contentHeight = pageHeight - titleAreaHeight - bottomTextHeight - 10;
+    const contentY = headerHeight + 3;
+    const contentHeight = pageHeight - headerHeight - bottomHeight - 8;
     
     // CALCULAR GRID DE FOTOS
     const photos = page.photos;
@@ -513,17 +518,17 @@ async function generatePDFPage(pdf, pageIdx) {
         }
     }
     
-    // TEXTO ABAJO DE LA HOJA (sin fondo, sin rectángulo)
-    const footerText = currentReport.footerText || CONFIG.footerText;
+    // TEXTO INFERIOR (sin fondo, solo texto)
     pdf.setTextColor(80, 80, 80);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
-    
+    const bottomText = currentReport.bottomText || CONFIG.bottomText;
+    pdf.text(bottomText, pageWidth / 2, pageHeight - 12, { align: 'center' });
+
     // Número de página
     pdf.setFontSize(7);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(`Página ${pageIdx + 1} de ${currentReport.pages.length}`, pageWidth - margin, pageHeight - 4, { align: 'right' });
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(`Página ${pageIdx + 1} de ${currentReport.pages.length}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
 }
 
 function loadImage(src) {
@@ -549,10 +554,49 @@ function hexToRgb(hex) {
 // ===============================================
 
 async function showPDFPreview(pdf) {
-    // Skip blank preview, go straight to download
-    const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
-    pdf.save(fileName);
-    showToast('✅ PDF descargado correctamente');
+    const modal = document.getElementById('pdfPreviewModal');
+    const container = document.getElementById('pdfCanvasContainer');
+    const stats = document.getElementById('pdfStats');
+    
+    container.innerHTML = '';
+    
+    const totalPages = currentReport.pages.reduce((sum, page) => sum + page.photos.length, 0);
+    stats.innerHTML = `
+        <strong>📄 ${currentReport.pages.length}</strong> página(s) • 
+        <strong>📸 ${totalPages}</strong> foto(s) • 
+        <strong>📏</strong> Tamaño: Carta (Letter)
+    `;
+    
+    // Generar previews de cada página
+    const numPages = pdf.internal.getNumberOfPages();
+    
+    for (let i = 1; i <= numPages; i++) {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'pdf-preview-canvas';
+        
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const scale = 2;
+        
+        canvas.width = pageWidth * scale;
+        canvas.height = pageHeight * scale;
+        canvas.style.width = '100%';
+        canvas.style.maxWidth = '600px';
+        
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, pageWidth, pageHeight);
+        
+        const pageLabel = document.createElement('div');
+        pageLabel.className = 'pdf-page-label';
+        pageLabel.textContent = `Página ${i}`;
+        
+        container.appendChild(pageLabel);
+        container.appendChild(canvas);
+    }
+    
+    modal.classList.add('active');
 }
 
 function closePDFPreview() {
@@ -584,26 +628,6 @@ function showSettings() {
 
 function closeSettings() {
     document.getElementById('settingsModal').classList.remove('active');
-}
-
-function editReportSettings() {
-    const headerText = prompt('Texto del encabezado:', currentReport.headerText || CONFIG.headerText);
-    if (headerText !== null) {
-        currentReport.headerText = headerText;
-        if (CONFIG.autoSave) saveCurrentReport();
-        showToast('✅ Encabezado actualizado');
-    }
-}
-
-function editHeaderColor() {
-    const color = prompt('Color del encabezado (ej: #FF6B35):', currentReport.headerColor || CONFIG.headerColor);
-    if (color !== null && /^#[0-9A-F]{6}$/i.test(color)) {
-        currentReport.headerColor = color;
-        if (CONFIG.autoSave) saveCurrentReport();
-        showToast('✅ Color actualizado');
-    } else if (color !== null) {
-        showToast('❌ Color inválido. Use formato #RRGGBB');
-    }
 }
 
 async function uploadLogo() {
@@ -638,13 +662,14 @@ async function uploadLogo() {
     input.click();
 }
 
-function editFooter() {
-    const footerText = prompt('Texto del pie de página:', currentReport.footerText || CONFIG.footerText);
-    if (footerText !== null) {
-        currentReport.footerText = footerText;
+function editBottomText() {
+    const txt = prompt('Texto inferior de la hoja:', currentReport.bottomText || CONFIG.bottomText);
+    if (txt !== null) {
+        currentReport.bottomText = txt;
         if (CONFIG.autoSave) saveCurrentReport();
-        showToast('✅ Pie de página actualizado');
+        showToast('✅ Texto inferior actualizado');
     }
+    closeMenu();
 }
 
 // ===============================================
@@ -660,7 +685,7 @@ function closeMenu() {
 }
 
 function editReportTitle() {
-    const newTitle = prompt('Nuevo nombre del reporte:', currentReport.title);
+    const newTitle = prompt('Título de la página en el PDF:', currentReport.title);
     if (newTitle && newTitle.trim()) {
         currentReport.title = newTitle.trim();
         document.getElementById('reportTitle').textContent = currentReport.title;
@@ -776,6 +801,8 @@ function renderReports() {
         `;
         return;
     }
+    
+    sortReports();
     
     container.innerHTML = reports.map(report => {
         const totalPhotos = report.pages.reduce((sum, page) => sum + page.photos.length, 0);
