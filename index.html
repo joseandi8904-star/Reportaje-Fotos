@@ -158,6 +158,10 @@
                 <span class="menu-icon">📝</span>
                 <span>Texto inferior</span>
             </button>
+            <button class="menu-item" onclick="showSizesModal()">
+                <span class="menu-icon">🔤</span>
+                <span>Tamaños</span>
+            </button>
             <button class="menu-item" onclick="duplicateReport()">
                 <span class="menu-icon">📋</span>
                 <span>Duplicar Reporte</span>
@@ -323,6 +327,35 @@
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="closePDFPreview()">Cancelar</button>
                 <button class="btn-primary" onclick="downloadPDFFromPreview()">📥 Descargar PDF</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal de Tamaños -->
+    <div id="sizesModal" class="modal">
+        <div class="modal-content menu-modal">
+            <div class="modal-header">
+                <h2>🔤 Tamaños</h2>
+                <button class="btn-close" onclick="closeSizesModal()">✕</button>
+            </div>
+            <div style="padding: 20px;">
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; font-weight:600; margin-bottom:8px;">Título: <span id="titleSizeValue">14</span> pt</label>
+                    <input type="range" id="titleSizeSlider" min="8" max="28" value="14" style="width:100%;" oninput="updateTitleSize()">
+                    <div style="display:flex; justify-content:space-between; color:#999; font-size:12px;"><span>Pequeño</span><span>Grande</span></div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; font-weight:600; margin-bottom:8px;">Texto inferior: <span id="bottomSizeValue">8</span> pt</label>
+                    <input type="range" id="bottomSizeSlider" min="5" max="16" value="8" style="width:100%;" oninput="updateBottomSize()">
+                    <div style="display:flex; justify-content:space-between; color:#999; font-size:12px;"><span>Pequeño</span><span>Grande</span></div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; font-weight:600; margin-bottom:8px;">Logo: <span id="logoSizeValue">20</span> mm</label>
+                    <input type="range" id="logoSizeSlider" min="8" max="40" value="20" style="width:100%;" oninput="updateLogoSize()">
+                    <div style="display:flex; justify-content:space-between; color:#999; font-size:12px;"><span>Pequeño</span><span>Grande</span></div>
+                </div>
+                <button class="btn-primary" onclick="closeSizesModal()" style="margin-top:10px;">Guardar</button>
             </div>
         </div>
     </div>

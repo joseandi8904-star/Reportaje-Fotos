@@ -12,7 +12,10 @@ const CONFIG = {
     pdfAlignment: 'center',
     darkMode: false,
     logoImage: null,
-    bottomText: 'Período del 01 de septiembre al 30 de septiembre de 2025 - INSTITUCIÓN EDUCATIVA'
+    bottomText: 'Período del 01 de septiembre al 30 de septiembre de 2025 - INSTITUCIÓN EDUCATIVA',
+    titleSize: 14,
+    bottomSize: 8,
+    logoSize: 20
 };
 
 // Variables globales
@@ -420,30 +423,33 @@ async function generatePDFPage(pdf, pageIdx) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     
     const margin = 10;
-    const logoSize = 20;
-    const headerHeight = 25;
-    const bottomHeight = 10;
+    const logoSize = CONFIG.logoSize || 20;
+    const titleFontSize = CONFIG.titleSize || 14;
+    const bottomFontSize = CONFIG.bottomSize || 8;
 
-    // LOGO (si existe, a la izquierda)
+    // LOGO (si existe, a la izquierda arriba)
     let titleX = margin;
+    let headerHeight = titleFontSize * 0.4 + 6; // altura dinámica según font
     if (currentReport.logoImage) {
         try {
-            pdf.addImage(currentReport.logoImage, 'JPEG', margin, 2.5, logoSize, logoSize);
-            titleX = margin + logoSize + 5;
+            pdf.addImage(currentReport.logoImage, 'JPEG', margin, 2, logoSize, logoSize);
+            titleX = margin + logoSize + 4;
+            if (logoSize + 4 > headerHeight) headerHeight = logoSize + 4;
         } catch (e) {
             console.warn('Error agregando logo:', e);
         }
     }
 
-    // TÍTULO (texto negro, sin fondo de color)
+    // TÍTULO (negro, sin fondo de color)
     pdf.setTextColor(0, 0, 0);
-    pdf.setFontSize(14);
+    pdf.setFontSize(titleFontSize);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(currentReport.title, titleX, 14);
+    const titleY = (headerHeight / 2) + (titleFontSize * 0.35);
+    pdf.text(currentReport.title, titleX, titleY);
 
     // ÁREA DE CONTENIDO
     const contentY = headerHeight + 3;
-    const contentHeight = pageHeight - headerHeight - bottomHeight - 8;
+    const contentHeight = pageHeight - headerHeight - 14;
     
     // CALCULAR GRID DE FOTOS
     const photos = page.photos;
@@ -520,15 +526,15 @@ async function generatePDFPage(pdf, pageIdx) {
     
     // TEXTO INFERIOR (sin fondo, solo texto)
     pdf.setTextColor(80, 80, 80);
-    pdf.setFontSize(8);
+    pdf.setFontSize(bottomFontSize);
     pdf.setFont('helvetica', 'normal');
     const bottomText = currentReport.bottomText || CONFIG.bottomText;
-    pdf.text(bottomText, pageWidth / 2, pageHeight - 12, { align: 'center' });
+    pdf.text(bottomText, pageWidth / 2, pageHeight - 11, { align: 'center' });
 
     // Número de página
     pdf.setFontSize(7);
     pdf.setTextColor(120, 120, 120);
-    pdf.text(`Página ${pageIdx + 1} de ${currentReport.pages.length}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+    pdf.text(`Página ${pageIdx + 1} de ${currentReport.pages.length}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
 }
 
 function loadImage(src) {
@@ -554,49 +560,9 @@ function hexToRgb(hex) {
 // ===============================================
 
 async function showPDFPreview(pdf) {
-    const modal = document.getElementById('pdfPreviewModal');
-    const container = document.getElementById('pdfCanvasContainer');
-    const stats = document.getElementById('pdfStats');
-    
-    container.innerHTML = '';
-    
-    const totalPages = currentReport.pages.reduce((sum, page) => sum + page.photos.length, 0);
-    stats.innerHTML = `
-        <strong>📄 ${currentReport.pages.length}</strong> página(s) • 
-        <strong>📸 ${totalPages}</strong> foto(s) • 
-        <strong>📏</strong> Tamaño: Carta (Letter)
-    `;
-    
-    // Generar previews de cada página
-    const numPages = pdf.internal.getNumberOfPages();
-    
-    for (let i = 1; i <= numPages; i++) {
-        const canvas = document.createElement('canvas');
-        canvas.className = 'pdf-preview-canvas';
-        
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const scale = 2;
-        
-        canvas.width = pageWidth * scale;
-        canvas.height = pageHeight * scale;
-        canvas.style.width = '100%';
-        canvas.style.maxWidth = '600px';
-        
-        const ctx = canvas.getContext('2d');
-        ctx.scale(scale, scale);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, pageWidth, pageHeight);
-        
-        const pageLabel = document.createElement('div');
-        pageLabel.className = 'pdf-page-label';
-        pageLabel.textContent = `Página ${i}`;
-        
-        container.appendChild(pageLabel);
-        container.appendChild(canvas);
-    }
-    
-    modal.classList.add('active');
+    const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
+    pdf.save(fileName);
+    showToast('✅ PDF descargado correctamente');
 }
 
 function closePDFPreview() {
@@ -685,12 +651,12 @@ function closeMenu() {
 }
 
 function editReportTitle() {
-    const newTitle = prompt('Título de la página en el PDF:', currentReport.title);
+    const newTitle = prompt('Título (aparece arriba de la hoja en el PDF):', currentReport.title);
     if (newTitle && newTitle.trim()) {
         currentReport.title = newTitle.trim();
         document.getElementById('reportTitle').textContent = currentReport.title;
         if (CONFIG.autoSave) saveCurrentReport();
-        showToast('✅ Nombre actualizado');
+        showToast('✅ Título actualizado');
     }
     closeMenu();
 }
@@ -1162,5 +1128,45 @@ window.onclick = function(event) {
         event.target.classList.remove('active');
     }
 };
+
+
+// ===============================================
+// MODAL DE TAMAÑOS
+// ===============================================
+
+function showSizesModal() {
+    closeMenu();
+    document.getElementById('titleSizeSlider').value = CONFIG.titleSize || 14;
+    document.getElementById('titleSizeValue').textContent = CONFIG.titleSize || 14;
+    document.getElementById('bottomSizeSlider').value = CONFIG.bottomSize || 8;
+    document.getElementById('bottomSizeValue').textContent = CONFIG.bottomSize || 8;
+    document.getElementById('logoSizeSlider').value = CONFIG.logoSize || 20;
+    document.getElementById('logoSizeValue').textContent = CONFIG.logoSize || 20;
+    document.getElementById('sizesModal').classList.add('active');
+}
+
+function closeSizesModal() {
+    document.getElementById('sizesModal').classList.remove('active');
+    saveSettings();
+    showToast('✅ Tamaños guardados');
+}
+
+function updateTitleSize() {
+    const val = document.getElementById('titleSizeSlider').value;
+    CONFIG.titleSize = parseInt(val);
+    document.getElementById('titleSizeValue').textContent = val;
+}
+
+function updateBottomSize() {
+    const val = document.getElementById('bottomSizeSlider').value;
+    CONFIG.bottomSize = parseInt(val);
+    document.getElementById('bottomSizeValue').textContent = val;
+}
+
+function updateLogoSize() {
+    const val = document.getElementById('logoSizeSlider').value;
+    CONFIG.logoSize = parseInt(val);
+    document.getElementById('logoSizeValue').textContent = val;
+}
 
 console.log('✅ Reportes Fotográficos v3.0 - Cargado correctamente');
