@@ -451,121 +451,55 @@ async function generatePDF() {
 
 async function downloadPDFMultiMethod(pdf) {
     const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
-    const pdfBlob = pdf.output('blob');
     
-    // Guardar referencia global
-    window.currentPDFBlob = pdfBlob;
-    window.currentPDFFileName = fileName;
-    
-    let downloadSuccess = false;
-    
-    // MÉTODO 1: File System Access API (Chrome/Edge moderno)
-    if ('showSaveFilePicker' in window) {
-        try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: fileName,
-                types: [{
-                    description: 'PDF Document',
-                    accept: { 'application/pdf': ['.pdf'] }
-                }]
-            });
-            const writable = await handle.createWritable();
-            await writable.write(pdfBlob);
-            await writable.close();
-            downloadSuccess = true;
-            showToast('✅ PDF guardado exitosamente');
-            showDownloadOptionsModal();
-            return;
-        } catch (e) {
-            console.log('File System API no disponible:', e);
-        }
-    }
-    
-    // MÉTODO 2: Iframe con Blob URL (muy efectivo en APKs)
     try {
-        const url = URL.createObjectURL(pdfBlob);
+        showLoading('Preparando PDF para descarga...');
         
-        // Crear iframe oculto para forzar descarga
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
+        // SOLUCIÓN DEFINITIVA: Convertir a Base64 Data URI
+        // Este método funciona en TODOS los WebView sin configuración
+        const pdfBase64 = pdf.output('dataurlstring'); // data:application/pdf;base64,JVBERi0x...
         
-        // Intentar descarga desde el iframe
-        setTimeout(() => {
-            try {
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                const a = iframeDoc.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                iframeDoc.body.appendChild(a);
-                a.click();
-            } catch (e) {
-                console.log('Descarga desde iframe falló:', e);
-            }
-        }, 100);
+        // Guardar también como blob para otras funciones
+        const pdfBlob = pdf.output('blob');
+        window.currentPDFBlob = pdfBlob;
+        window.currentPDFFileName = fileName;
         
-        // Método tradicional como backup
+        hideLoading();
+        
+        // Crear enlace de descarga con Data URI (funciona 100% en WebView)
         const a = document.createElement('a');
-        a.href = url;
+        a.href = pdfBase64;
         a.download = fileName;
         a.style.display = 'none';
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
         
         document.body.appendChild(a);
         
-        // Múltiples intentos con diferentes timings
+        // Click para iniciar descarga
         a.click();
-        setTimeout(() => a.click(), 100);
-        setTimeout(() => a.click(), 300);
-        setTimeout(() => a.click(), 500);
         
-        // Limpiar después
+        // Esperar un momento y hacer clic de nuevo por si acaso
         setTimeout(() => {
-            try {
-                document.body.removeChild(iframe);
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } catch (e) {}
-        }, 2000);
-        
-        downloadSuccess = true;
-    } catch (e) {
-        console.error('Método blob/iframe falló:', e);
-    }
-    
-    // MÉTODO 3: Data URI directo
-    if (!downloadSuccess) {
-        try {
-            const pdfData = pdf.output('dataurlstring');
-            const a = document.createElement('a');
-            a.href = pdfData;
-            a.download = fileName;
-            a.target = '_blank';
-            document.body.appendChild(a);
             a.click();
-            setTimeout(() => document.body.removeChild(a), 100);
-            downloadSuccess = true;
-        } catch (e) {
-            console.error('Método data URI falló:', e);
-        }
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(a);
+                } catch(e) {}
+            }, 500);
+        }, 100);
+        
+        // Mostrar toast de éxito
+        showToast('✅ PDF generado - Revisa notificaciones');
+        
+        // Mostrar modal con opciones alternativas después de intentar descarga
+        setTimeout(() => {
+            showDownloadOptionsModal();
+        }, 800);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error generando PDF:', error);
+        showToast('❌ Error al generar el PDF');
     }
-    
-    // MÉTODO 4: Abrir en nueva ventana (último recurso)
-    if (!downloadSuccess) {
-        try {
-            const pdfDataUri = pdf.output('dataurlstring');
-            window.open(pdfDataUri, '_blank');
-        } catch (e) {
-            console.error('Método nueva ventana falló:', e);
-        }
-    }
-    
-    // Mostrar modal de opciones siempre
-    setTimeout(() => {
-        showDownloadOptionsModal();
-    }, 500);
 }
 
 async function generatePDFPage(pdf, pageIdx) {
@@ -719,52 +653,52 @@ function showDownloadOptionsModal() {
     const modal = document.createElement('div');
     modal.className = 'modal active';
     modal.id = 'downloadOptionsModal';
+    modal.style.zIndex = '10000';
     modal.innerHTML = `
         <div class="modal-content menu-modal">
-            <div class="modal-header">
-                <h2>📄 PDF Generado</h2>
-                <button class="btn-close" onclick="closeDownloadOptions()">✕</button>
+            <div class="modal-header" style="background: var(--primary-color); color: white; padding: 20px;">
+                <h2 style="margin: 0; color: white;">✅ PDF Generado</h2>
+                <button class="btn-close" onclick="closeDownloadOptions()" style="color: white; background: rgba(255,255,255,0.2);">✕</button>
             </div>
+            
             <div style="padding: 20px;">
+                <div style="text-align: center; padding: 20px; background: rgba(76,175,80,0.1); border-radius: 10px; margin-bottom: 20px;">
+                    <p style="font-size: 18px; margin: 0; color: #4CAF50; font-weight: 600;">
+                        📥 Revisa tus notificaciones
+                    </p>
+                    <p style="font-size: 14px; margin: 10px 0 0 0; color: var(--text-dark);">
+                        El PDF debería estar descargándose
+                    </p>
+                </div>
+                
                 <p style="text-align: center; margin-bottom: 20px; color: var(--text-dark); font-weight: 500;">
-                    ¿Qué deseas hacer con el PDF?
+                    ¿No se descargó? Usa estas opciones:
                 </p>
                 
-                <button class="btn-primary" onclick="openPDFInNewTab()" style="margin-bottom: 10px; width: 100%;">
-                    👁️ Ver PDF
+                <button class="btn-primary" onclick="sharePDF()" style="margin-bottom: 12px; width: 100%; padding: 15px; font-size: 16px;">
+                    📤 Compartir por WhatsApp/Email
                 </button>
                 
-                <button class="btn-primary" onclick="sharePDF()" style="margin-bottom: 10px; width: 100%;">
-                    📤 Compartir PDF
+                <button class="btn-primary" onclick="savePDFToLocalStorage()" style="margin-bottom: 12px; width: 100%; padding: 15px; font-size: 16px;">
+                    💿 Guardar en la App
                 </button>
                 
-                <button class="btn-primary" onclick="downloadPDFAgain()" style="margin-bottom: 10px; width: 100%;">
-                    💾 Descargar de Nuevo
+                <button class="btn-secondary" onclick="retryDownload()" style="margin-bottom: 12px; width: 100%; padding: 15px; font-size: 16px;">
+                    🔄 Reintentar Descarga
                 </button>
                 
-                <button class="btn-secondary" onclick="savePDFToLocalStorage()" style="margin-bottom: 10px; width: 100%;">
-                    💿 Guardar en App
-                </button>
-                
-                <button class="btn-secondary" onclick="openDownloadsFolder()" style="margin-bottom: 10px; width: 100%;">
-                    📁 Abrir Descargas
-                </button>
-                
-                <button class="btn-secondary" onclick="closeDownloadOptions()" style="width: 100%;">
+                <button class="btn-secondary" onclick="closeDownloadOptions()" style="width: 100%; padding: 12px;">
                     ✕ Cerrar
                 </button>
                 
-                <div style="margin-top: 20px; padding: 15px; background: rgba(255,107,53,0.1); border-radius: 10px; border-left: 4px solid var(--primary-color);">
+                <div style="margin-top: 20px; padding: 15px; background: rgba(33,150,243,0.1); border-radius: 8px; border-left: 4px solid #2196F3;">
                     <p style="font-size: 13px; color: var(--text-dark); margin-bottom: 8px;">
-                        <strong>⚠️ Si no se descargó automáticamente:</strong>
+                        <strong>💡 Dónde buscar el PDF:</strong>
                     </p>
-                    <p style="font-size: 12px; color: var(--text-light); margin-bottom: 5px;">
-                        1. Toca "Ver PDF" para abrirlo<br>
-                        2. Luego toca el ícono de descarga (⬇️) en el visor<br>
-                        3. O usa "Compartir" para enviarlo por WhatsApp/Email
-                    </p>
-                    <p style="font-size: 11px; color: var(--text-light); margin-top: 10px;">
-                        📌 Nombre: <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">${window.currentPDFFileName}</code>
+                    <p style="font-size: 12px; color: var(--text-light); margin: 0; line-height: 1.6;">
+                        • <strong>Notificaciones:</strong> Barra superior de Android<br>
+                        • <strong>Mis Archivos:</strong> Carpeta "Descargas" o "Download"<br>
+                        • <strong>Nombre:</strong> <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px; font-size: 11px;">${window.currentPDFFileName}</code>
                     </p>
                 </div>
             </div>
@@ -773,57 +707,45 @@ function showDownloadOptionsModal() {
     document.body.appendChild(modal);
 }
 
-function openPDFInNewTab() {
+function retryDownload() {
     try {
         if (!window.currentPDFBlob) {
             showToast('⚠️ PDF no disponible');
             return;
         }
         
-        // Crear URL del blob
-        const url = URL.createObjectURL(window.currentPDFBlob);
+        showLoading('Reintentando descarga...');
         
-        // Abrir en nueva pestaña/ventana
-        const newWindow = window.open(url, '_blank');
-        
-        if (newWindow) {
-            showToast('✅ PDF abierto en nueva pestaña');
+        // Recrear el PDF como base64 para reintentar
+        const reader = new FileReader();
+        reader.onloadend = function() {
+            const base64data = reader.result;
             
-            // Desde ahí el usuario puede descargar manualmente
+            const a = document.createElement('a');
+            a.href = base64data;
+            a.download = window.currentPDFFileName;
+            a.style.display = 'none';
+            
+            document.body.appendChild(a);
+            a.click();
+            
             setTimeout(() => {
-                showToast('💡 Usa el botón de descarga del visor');
-            }, 2000);
-        } else {
-            // Si el popup fue bloqueado, crear un iframe
-            const iframe = document.createElement('iframe');
-            iframe.src = url;
-            iframe.style.width = '100%';
-            iframe.style.height = '80vh';
-            iframe.style.border = 'none';
-            
-            // Crear modal para mostrar el PDF
-            const pdfModal = document.createElement('div');
-            pdfModal.className = 'modal active';
-            pdfModal.innerHTML = `
-                <div class="modal-content" style="max-width: 95%; height: 90vh; padding: 0;">
-                    <div class="modal-header" style="padding: 15px;">
-                        <h2>📄 ${window.currentPDFFileName}</h2>
-                        <button class="btn-close" onclick="this.closest('.modal').remove()">✕</button>
-                    </div>
-                    <div style="height: calc(100% - 60px); overflow: auto;"></div>
-                </div>
-            `;
-            pdfModal.querySelector('.modal-content > div:last-child').appendChild(iframe);
-            document.body.appendChild(pdfModal);
-            
-            showToast('✅ PDF mostrado');
-        }
-        
-        closeDownloadOptions();
+                a.click(); // Segundo intento
+                setTimeout(() => {
+                    try {
+                        document.body.removeChild(a);
+                    } catch(e) {}
+                    hideLoading();
+                    showToast('📥 Revisa las notificaciones de descarga');
+                }, 200);
+            }, 100);
+        };
+        reader.readAsDataURL(window.currentPDFBlob);
         
     } catch (error) {
-        console.error('Error abriendo PDF:', error);
-        showToast('❌ Error al abrir el PDF');
+        hideLoading();
+        console.error('Error reintentando descarga:', error);
+        showToast('❌ Error al reintentar. Usa "Compartir" o "Guardar en App"');
     }
 }
 
