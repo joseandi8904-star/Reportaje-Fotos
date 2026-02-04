@@ -439,14 +439,95 @@ async function generatePDF() {
         
         hideLoading();
         
-        // Descargar PDF directamente (optimizado para APK/Web2App)
-        showPDFPreview(pdf);
+        // Intentar múltiples métodos de descarga para máxima compatibilidad
+        await downloadPDFMultiMethod(pdf);
         
     } catch (error) {
         hideLoading();
         console.error('Error generando PDF:', error);
         showToast('❌ Error al generar el PDF');
     }
+}
+
+async function downloadPDFMultiMethod(pdf) {
+    const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
+    const pdfBlob = pdf.output('blob');
+    
+    // Guardar referencia global
+    window.currentPDFBlob = pdfBlob;
+    window.currentPDFFileName = fileName;
+    
+    let downloadSuccess = false;
+    
+    // MÉTODO 1: File System Access API (Chrome/Edge moderno en Android)
+    if ('showSaveFilePicker' in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{
+                    description: 'PDF Document',
+                    accept: { 'application/pdf': ['.pdf'] }
+                }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(pdfBlob);
+            await writable.close();
+            downloadSuccess = true;
+            showToast('✅ PDF guardado exitosamente');
+            showDownloadOptionsModal();
+            return;
+        } catch (e) {
+            console.log('File System API no disponible o cancelado');
+        }
+    }
+    
+    // MÉTODO 2: Descarga tradicional con Blob URL (más compatible)
+    try {
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        a.setAttribute('target', '_blank');
+        
+        document.body.appendChild(a);
+        
+        // Triple intento de descarga
+        a.click();
+        setTimeout(() => a.click(), 50);
+        setTimeout(() => a.click(), 150);
+        
+        setTimeout(() => {
+            try {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {}
+        }, 1000);
+        
+        downloadSuccess = true;
+    } catch (e) {
+        console.error('Método blob falló:', e);
+    }
+    
+    // MÉTODO 3: Data URI (fallback para navegadores antiguos)
+    if (!downloadSuccess) {
+        try {
+            const dataUri = pdf.output('dataurlstring');
+            const a = document.createElement('a');
+            a.href = dataUri;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error('Método data URI falló:', e);
+        }
+    }
+    
+    // Mostrar modal de opciones
+    setTimeout(() => {
+        showDownloadOptionsModal();
+    }, 300);
 }
 
 async function generatePDFPage(pdf, pageIdx) {
@@ -588,36 +669,151 @@ function hexToRgb(hex) {
 }
 
 // ===============================================
-// VISTA PREVIA PDF
+// VISTA PREVIA PDF (Ya no se usa, pero se mantiene por compatibilidad)
 // ===============================================
 
 async function showPDFPreview(pdf) {
+    // Esta función ahora solo llama al método multi-método
+    await downloadPDFMultiMethod(pdf);
+}
+
+function showDownloadOptionsModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'downloadOptionsModal';
+    modal.innerHTML = `
+        <div class="modal-content menu-modal">
+            <div class="modal-header">
+                <h2>✅ PDF Generado</h2>
+                <button class="btn-close" onclick="closeDownloadOptions()">✕</button>
+            </div>
+            <div style="padding: 20px;">
+                <p style="text-align: center; margin-bottom: 20px; color: var(--text-dark);">
+                    El PDF ha sido generado. Elige una opción:
+                </p>
+                
+                <button class="btn-primary" onclick="sharePDF()" style="margin-bottom: 10px; width: 100%;">
+                    📤 Compartir PDF
+                </button>
+                
+                <button class="btn-primary" onclick="openDownloadsFolder()" style="margin-bottom: 10px; width: 100%;">
+                    📁 Abrir Descargas
+                </button>
+                
+                <button class="btn-secondary" onclick="downloadPDFAgain()" style="margin-bottom: 10px; width: 100%;">
+                    💾 Descargar de Nuevo
+                </button>
+                
+                <button class="btn-secondary" onclick="closeDownloadOptions()" style="width: 100%;">
+                    ✕ Cerrar
+                </button>
+                
+                <p style="text-align: center; margin-top: 15px; font-size: 12px; color: var(--text-light);">
+                    💡 Busca el archivo en:<br>
+                    "Mis Archivos" → "Descargas"<br>
+                    Nombre: ${window.currentPDFFileName}
+                </p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeDownloadOptions() {
+    const modal = document.getElementById('downloadOptionsModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function sharePDF() {
     try {
-        // Generar nombre del archivo
-        const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
+        if (!window.currentPDFBlob) {
+            showToast('⚠️ PDF no disponible');
+            return;
+        }
         
-        // Método mejorado para APK/Web2App - Descarga forzada con Blob
-        const pdfBlob = pdf.output('blob');
-        const url = URL.createObjectURL(pdfBlob);
+        // Crear File del Blob
+        const file = new File([window.currentPDFBlob], window.currentPDFFileName, {
+            type: 'application/pdf'
+        });
         
+        // Verificar si Web Share API está disponible
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: currentReport.title,
+                text: 'Reporte fotográfico generado'
+            });
+            showToast('✅ PDF compartido');
+            closeDownloadOptions();
+        } else {
+            // Alternativa: descargar de nuevo
+            showToast('ℹ️ Descargando PDF...');
+            downloadPDFAgain();
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error('Error compartiendo:', error);
+            showToast('ℹ️ Descargando PDF...');
+            downloadPDFAgain();
+        }
+    }
+}
+
+function openDownloadsFolder() {
+    try {
+        // Intentar abrir la carpeta de descargas
+        // Método 1: Intent de Android (si está en WebView con permisos)
+        if (window.Android && window.Android.openDownloads) {
+            window.Android.openDownloads();
+        } 
+        // Método 2: URL de descargas (algunos navegadores)
+        else if (navigator.userAgent.includes('Android')) {
+            // Intentar abrir el gestor de archivos
+            window.location.href = 'content://downloads/my_downloads';
+            
+            setTimeout(() => {
+                showToast('📁 Busca en "Mis Archivos" → "Descargas"');
+            }, 500);
+        }
+        // Método 3: Para navegadores de escritorio
+        else {
+            showToast('📁 Revisa tu carpeta de Descargas');
+        }
+        
+        closeDownloadOptions();
+    } catch (error) {
+        showToast('📁 Busca en "Mis Archivos" → "Descargas"');
+        closeDownloadOptions();
+    }
+}
+
+function downloadPDFAgain() {
+    if (!window.currentPDFBlob) {
+        showToast('⚠️ PDF no disponible');
+        return;
+    }
+    
+    try {
+        const url = URL.createObjectURL(window.currentPDFBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = fileName;
+        a.download = window.currentPDFFileName;
         a.style.display = 'none';
         
         document.body.appendChild(a);
         a.click();
         
-        // Limpiar después de un momento
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
         
-        showToast('✅ PDF descargado en carpeta Descargas');
+        showToast('💾 Descargando PDF...');
     } catch (error) {
-        console.error('Error al descargar PDF:', error);
-        showToast('❌ Error al descargar el PDF');
+        console.error('Error descargando:', error);
+        showToast('❌ Error al descargar');
     }
 }
 
@@ -629,13 +825,13 @@ async function downloadPDFFromPreview() {
     if (!pdfInstance) return;
     
     try {
-        // Generar nombre del archivo
         const fileName = `${currentReport.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().getTime()}.pdf`;
-        
-        // Método mejorado para APK/Web2App - Descarga forzada con Blob
         const pdfBlob = pdfInstance.output('blob');
-        const url = URL.createObjectURL(pdfBlob);
         
+        window.currentPDFBlob = pdfBlob;
+        window.currentPDFFileName = fileName;
+        
+        const url = URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
@@ -644,14 +840,19 @@ async function downloadPDFFromPreview() {
         document.body.appendChild(a);
         a.click();
         
-        // Limpiar después de un momento
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
         
-        showToast('✅ PDF descargado en carpeta Descargas');
+        showToast('✅ PDF descargado');
         closePDFPreview();
+        
+        // Mostrar opciones
+        setTimeout(() => {
+            showDownloadOptionsModal();
+        }, 500);
+        
     } catch (error) {
         console.error('Error al descargar PDF:', error);
         showToast('❌ Error al descargar el PDF');
