@@ -1,10 +1,11 @@
+
 // ===============================================
-// SERVICE WORKER - Reportes Fotográficos Pro v2.0
+// SERVICE WORKER - Reportes Fotográficos Pro v3.0
 // ===============================================
 
-const CACHE_NAME = 'reportes-foto-pro-v2.0';
-const STATIC_CACHE = 'static-v2.0';
-const DYNAMIC_CACHE = 'dynamic-v2.0';
+const CACHE_NAME = 'reportes-foto-pro-v3.0';
+const STATIC_CACHE = 'static-v3.0';
+const DYNAMIC_CACHE = 'dynamic-v3.0';
 
 const STATIC_ASSETS = [
   '/',
@@ -181,4 +182,4 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-console.log('[SW] Service Worker v2.0 cargado');
+console.log('[SW] Service Worker v3.0 cargado');

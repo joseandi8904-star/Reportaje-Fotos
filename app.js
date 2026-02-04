@@ -597,6 +597,7 @@ function closeSettings() {
 }
 
 async function uploadLogo() {
+    closeMenu();
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -768,6 +769,7 @@ function renderReports() {
         return;
     }
     
+    // Ordenar reportes antes de renderizar
     sortReports();
     
     container.innerHTML = reports.map(report => {
@@ -808,8 +810,6 @@ function sortReports() {
             });
             break;
     }
-    
-    renderReports();
 }
 
 function searchReports() {
