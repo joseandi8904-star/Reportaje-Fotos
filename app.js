@@ -252,13 +252,42 @@ function renderPhotos() {
         const photoCard = document.createElement('div');
         photoCard.className = 'photo-card';
         photoCard.innerHTML = `
-            <img src="${photo.data}" alt="Foto ${index + 1}">
+            <img src="${photo.data}" alt="Foto ${index + 1}" draggable="false">
             <div class="photo-overlay">
-                <button class="photo-btn" onclick="viewPhoto(${index})">👁️</button>
-                <button class="photo-btn" onclick="deletePhoto(${index})">🗑️</button>
+                <button class="photo-btn" data-action="view" data-index="${index}">👁️</button>
+                <button class="photo-btn" data-action="delete" data-index="${index}">🗑️</button>
             </div>
             ${photo.note ? `<div class="photo-note-preview">📝 ${photo.note.substring(0, 30)}...</div>` : ''}
         `;
+        
+        // Agregar event listeners a los botones
+        const viewBtn = photoCard.querySelector('[data-action="view"]');
+        const deleteBtn = photoCard.querySelector('[data-action="delete"]');
+        
+        viewBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            viewPhoto(index);
+        });
+        
+        viewBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            viewPhoto(index);
+        });
+        
+        deleteBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            deletePhoto(index);
+        });
+        
+        deleteBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            deletePhoto(index);
+        });
+        
         grid.appendChild(photoCard);
     });
     
@@ -285,6 +314,9 @@ function initSortable() {
         sortableInstance = Sortable.create(grid, {
             animation: 150,
             ghostClass: 'sortable-ghost',
+            handle: '.photo-card',
+            filter: '.photo-btn',
+            preventOnFilter: false,
             onEnd: function(evt) {
                 const currentPage = currentReport.pages[currentPageIndex];
                 const item = currentPage.photos.splice(evt.oldIndex, 1)[0];

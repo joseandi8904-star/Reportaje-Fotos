@@ -464,21 +464,35 @@ body {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    transition: background 0.3s;
+    transition: background 0.3s, opacity 0.3s;
     opacity: 0;
-    transition: opacity 0.3s;
+    pointer-events: none;
 }
 
-.photo-card:hover .photo-overlay {
+.photo-overlay > * {
+    pointer-events: auto;
+}
+
+.photo-card:hover .photo-overlay,
+.photo-card:active .photo-overlay,
+.photo-card:focus-within .photo-overlay {
     opacity: 1;
     background: rgba(0, 0, 0, 0.45);
+}
+
+/* Mostrar botones siempre en dispositivos táctiles */
+@media (hover: none) {
+    .photo-overlay {
+        opacity: 1;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.3) 100%);
+    }
 }
 
 .photo-btn {
     background: rgba(255, 255, 255, 0.9);
     border: none;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     font-size: 18px;
     cursor: pointer;
@@ -486,6 +500,22 @@ body {
     align-items: center;
     justify-content: center;
     transition: transform 0.2s, background 0.2s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    z-index: 10;
+}
+
+.photo-btn::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    right: -8px;
+    bottom: -8px;
+    border-radius: 50%;
 }
 
 .photo-btn:hover {
@@ -494,7 +524,8 @@ body {
 }
 
 .photo-btn:active {
-    transform: scale(0.9);
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 1);
 }
 
 .photo-note-preview {
