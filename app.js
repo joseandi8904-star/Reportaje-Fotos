@@ -439,7 +439,7 @@ async function generatePDF() {
         
         hideLoading();
         
-        // Mostrar vista previa
+        // Descargar PDF directamente (optimizado para APK/Web2App)
         showPDFPreview(pdf);
         
     } catch (error) {
@@ -592,9 +592,33 @@ function hexToRgb(hex) {
 // ===============================================
 
 async function showPDFPreview(pdf) {
-    const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
-    pdf.save(fileName);
-    showToast('✅ PDF descargado correctamente');
+    try {
+        // Generar nombre del archivo
+        const fileName = currentReport.title.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now() + '.pdf';
+        
+        // Método mejorado para APK/Web2App - Descarga forzada con Blob
+        const pdfBlob = pdf.output('blob');
+        const url = URL.createObjectURL(pdfBlob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar después de un momento
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        showToast('✅ PDF descargado en carpeta Descargas');
+    } catch (error) {
+        console.error('Error al descargar PDF:', error);
+        showToast('❌ Error al descargar el PDF');
+    }
 }
 
 function closePDFPreview() {
@@ -604,11 +628,34 @@ function closePDFPreview() {
 async function downloadPDFFromPreview() {
     if (!pdfInstance) return;
     
-    const fileName = `${currentReport.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().getTime()}.pdf`;
-    pdfInstance.save(fileName);
-    
-    showToast('✅ PDF descargado correctamente');
-    closePDFPreview();
+    try {
+        // Generar nombre del archivo
+        const fileName = `${currentReport.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().getTime()}.pdf`;
+        
+        // Método mejorado para APK/Web2App - Descarga forzada con Blob
+        const pdfBlob = pdfInstance.output('blob');
+        const url = URL.createObjectURL(pdfBlob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar después de un momento
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        showToast('✅ PDF descargado en carpeta Descargas');
+        closePDFPreview();
+    } catch (error) {
+        console.error('Error al descargar PDF:', error);
+        showToast('❌ Error al descargar el PDF');
+    }
 }
 
 // ===============================================
